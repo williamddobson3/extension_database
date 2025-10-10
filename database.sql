@@ -196,7 +196,9 @@ ALTER TABLE `change_history`
 ALTER TABLE `monitored_sites`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_monitored_sites_user_id` (`user_id`),
-  ADD KEY `idx_monitored_sites_last_check` (`last_check`);
+  ADD KEY `idx_monitored_sites_last_check` (`last_check`),
+  ADD KEY `idx_monitored_sites_user_active` (`user_id`, `is_active`),
+  ADD KEY `idx_monitored_sites_user_created` (`user_id`, `created_at`);
 
 --
 -- Indexes for table `notifications`
@@ -332,8 +334,8 @@ ALTER TABLE `change_history`
 
 
 
--- ALTER TABLE `monitored_sites`
---   ADD CONSTRAINT `monitored_sites_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+ALTER TABLE `monitored_sites`
+  ADD CONSTRAINT `monitored_sites_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 -- --
 -- -- Constraints for table `notifications`

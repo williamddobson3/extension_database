@@ -68,8 +68,7 @@ CREATE TABLE `monitored_sites` (
 -- Dumping data for table `monitored_sites`
 --
 
-INSERT INTO `monitored_sites` (`id`, `user_id`, `url`, `name`, `check_interval_hours`, `keywords`, `last_check`, `last_content_hash`, `last_status_code`, `last_response_time_ms`, `last_scraping_method`, `is_active`, `created_at`, `updated_at`) VALUES
-(3, 2, 'https://jsonplaceholder.typicode.com', 'JSON Placeholder', 24, 'json,api', '2025-09-13 07:29:10', NULL, NULL, NULL, NULL, 1, '2025-09-13 07:28:08', '2025-09-13 07:29:10');
+-- Sample data will be inserted after users are created
 
 -- --------------------------------------------------------
 
@@ -131,8 +130,7 @@ CREATE TABLE `site_checks` (
 -- Dumping data for table `site_checks`
 --
 
-INSERT INTO `site_checks` (`id`, `site_id`, `content_hash`, `text_content`, `content_length`, `status_code`, `response_time_ms`, `scraping_method`, `changes_detected`, `reason`, `change_type`, `change_reason`, `keywords_found`, `keywords_list`, `error_message`, `created_at`) VALUES
-(3, 3, 'e0d5e3d8e7c485becfeea63bfcc46c71', 'Check my new project ? MistCSS write React components with 50% less code JSONPlaceholder Guide Sponsor this project Blog My JSON Server {JSON} Placeholder Free fake and reliable API for testing and prototyping. Powered by JSON Server + LowDB. Serving ~3 billion requests each month. Sponsors JSONPlaceholder is supported by the following companies and Sponsors on GitHub, check them out ? Your company logo here Try it Run this code here, in a console or from any site: fetch(\'https://jsonplaceholder.typicode.com/todos/1\') .then(response => response.json()) .then(json => console.log(json)) Run script {} Congrats! You\'ve made your first call to JSONPlaceholder. ? ? When to use JSONPlaceholder is a free online REST API that you can use whenever you need some fake data. It can be in a README on GitHub, for a demo on CodeSandbox, in code examples on Stack Overflow, ...or simply to test things locally. Resources JSONPlaceholder comes with a set of 6 common resources: /posts 100 posts /comments 500 comments /albums 100 albums /photos 5000 photos /todos 200 todos /users 10 users Note: resources have relations. For example: posts have many comments, albums have many photos, ... see guide for the full list. Routes All HTTP methods are supported. You can use http or https for your requests. GET /posts GET /posts/1 GET /posts/1/comments GET /comments?postId=1 POST /posts PUT /posts/1 PATCH /posts/1 DELETE /posts/1 Note: see guide for usage examples. Use your own data With our sponsor Mockend and a simple GitHub repo, you can have your own fake online REST server in seconds. You can sponsor this project (and others) on GitHub Coded and maintained with ?? by typicode © 2024', 1688, 200, 2147483647, NULL, 1, NULL, NULL, NULL, 0, NULL, NULL, '2025-09-13 07:29:10');
+-- Sample data will be inserted after users are created
 
 -- --------------------------------------------------------
 
@@ -259,13 +257,13 @@ ALTER TABLE `change_history`
 -- AUTO_INCREMENT for table `monitored_sites`
 --
 ALTER TABLE `monitored_sites`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `scraped_content`
@@ -277,19 +275,19 @@ ALTER TABLE `scraped_content`
 -- AUTO_INCREMENT for table `site_checks`
 --
 ALTER TABLE `site_checks`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `user_notifications`
 --
 ALTER TABLE `user_notifications`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- Constraints for dumped tables

@@ -663,6 +663,55 @@ CREATE INDEX `idx_notification_guard_logs_site_decision_created` ON `notificatio
 CREATE INDEX `idx_evasion_signals_type_normalized_confidence` ON `evasion_signals` (`signal_type`, `normalized_value`, `confidence_score`);
 
 -- =====================================================
+-- REAL-TIME BLOCKING VERIFICATION TABLES
+-- =====================================================
+
+-- Blocked emails table
+CREATE TABLE IF NOT EXISTS blocked_emails (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    reason TEXT,
+    blocked_by INT,
+    is_active BOOLEAN DEFAULT TRUE,
+    blocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    unblocked_at TIMESTAMP NULL,
+    INDEX idx_email (email),
+    INDEX idx_is_active (is_active),
+    FOREIGN KEY (blocked_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Blocked access logs
+CREATE TABLE IF NOT EXISTS blocked_access_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    ip_address VARCHAR(45),
+    email VARCHAR(255),
+    block_reason TEXT,
+    block_type VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user_id (user_id),
+    INDEX idx_ip_address (ip_address),
+    INDEX idx_created_at (created_at),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- User sessions table
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    session_token VARCHAR(255),
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_session_token (session_token),
+    INDEX idx_expires_at (expires_at),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- =====================================================
 -- FINAL COMMIT
 -- =====================================================
 

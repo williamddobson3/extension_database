@@ -60,6 +60,8 @@ CREATE TABLE `monitored_sites` (
   `last_response_time_ms` int(11) DEFAULT NULL,
   `last_scraping_method` varchar(50) DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT 1,
+  `is_global_notification` tinyint(1) DEFAULT 0,
+  `scraping_method` enum('api','dom_parser') DEFAULT 'api',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -68,7 +70,10 @@ CREATE TABLE `monitored_sites` (
 -- Dumping data for table `monitored_sites`
 --
 
--- Sample data will be inserted after users are created
+-- Default Kao Kirei sites for global notifications
+INSERT INTO `monitored_sites` (`id`, `user_id`, `url`, `name`, `check_interval_hours`, `keywords`, `last_check`, `last_content_hash`, `last_status_code`, `last_response_time_ms`, `last_scraping_method`, `is_active`, `is_global_notification`, `scraping_method`, `created_at`, `updated_at`) VALUES
+(1, 0, 'https://www.kao-kirei.com/ja/expire-item/khg/?tw=khg', '花王 家庭用品の製造終了品一覧', 24, '製造終了品,家庭用品,花王', NULL, NULL, NULL, NULL, 'dom_parser', 1, 1, 'dom_parser', NOW(), NOW()),
+(2, 0, 'https://www.kao-kirei.com/ja/expire-item/kbb/?tw=kbb', '花王・カネボウ化粧品 製造終了品一覧', 24, '製造終了品,化粧品,花王,カネボウ', NULL, NULL, NULL, NULL, 'dom_parser', 1, 1, 'dom_parser', NOW(), NOW());
 
 -- --------------------------------------------------------
 
@@ -78,12 +83,36 @@ CREATE TABLE `monitored_sites` (
 
 CREATE TABLE `notifications` (
   `id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
+  `user_id` int(11) DEFAULT NULL,
   `site_id` int(11) NOT NULL,
   `type` enum('email','line') NOT NULL,
   `message` text NOT NULL,
   `sent_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `status` enum('pending','sent','failed') DEFAULT 'pending'
+  `status` enum('pending','sent','failed') DEFAULT 'pending',
+  `is_global` tinyint(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Sample global notifications for Kao Kirei sites
+INSERT INTO `notifications` (`id`, `user_id`, `site_id`, `type`, `message`, `sent_at`, `status`, `is_global`) VALUES
+(1, NULL, 1, 'email', '花王 家庭用品の製造終了品一覧に変更が検出されました。新しい商品が追加されたか、既存の商品が削除された可能性があります。', NOW(), 'pending', 1),
+(2, NULL, 2, 'line', '花王・カネボウ化粧品 製造終了品一覧に変更が検出されました。新しい商品が追加されたか、既存の商品が削除された可能性があります。', NOW(), 'pending', 1);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `product_data`
+--
+
+CREATE TABLE `product_data` (
+  `id` int(11) NOT NULL,
+  `site_id` int(11) NOT NULL,
+  `site_check_id` int(11) NOT NULL,
+  `product_name` varchar(500) NOT NULL,
+  `product_category` varchar(200) DEFAULT NULL,
+  `product_status` varchar(100) DEFAULT NULL,
+  `product_regulation` varchar(100) DEFAULT NULL,
+  `product_link` varchar(500) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -158,6 +187,10 @@ CREATE TABLE `users` (
 -- Dumping data for table `users`
 --
 
+-- System user for global notifications
+INSERT INTO `users` (`id`, `username`, `email`, `password_hash`, `line_user_id`, `is_active`, `is_admin`, `is_blocked`, `blocked_at`, `blocked_by`, `block_reason`, `created_at`, `updated_at`) VALUES
+(0, 'system_global', 'system@global.notifications', '', NULL, 1, 1, 0, NULL, NULL, NULL, NOW(), NOW());
+
 -- --------------------------------------------------------
 
 --
@@ -196,7 +229,9 @@ ALTER TABLE `monitored_sites`
   ADD KEY `idx_monitored_sites_user_id` (`user_id`),
   ADD KEY `idx_monitored_sites_last_check` (`last_check`),
   ADD KEY `idx_monitored_sites_user_active` (`user_id`, `is_active`),
-  ADD KEY `idx_monitored_sites_user_created` (`user_id`, `created_at`);
+  ADD KEY `idx_monitored_sites_user_created` (`user_id`, `created_at`),
+  ADD KEY `idx_monitored_sites_global_notification` (`is_global_notification`),
+  ADD KEY `idx_monitored_sites_scraping_method` (`scraping_method`);
 
 --
 -- Indexes for table `notifications`
@@ -205,7 +240,18 @@ ALTER TABLE `notifications`
   ADD PRIMARY KEY (`id`),
   ADD KEY `site_id` (`site_id`),
   ADD KEY `idx_notifications_user_id` (`user_id`),
-  ADD KEY `idx_notifications_sent_at` (`sent_at`);
+  ADD KEY `idx_notifications_sent_at` (`sent_at`),
+  ADD KEY `idx_notifications_is_global` (`is_global`);
+
+--
+-- Indexes for table `product_data`
+--
+ALTER TABLE `product_data`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_product_data_site_id` (`site_id`),
+  ADD KEY `idx_product_data_site_check_id` (`site_check_id`),
+  ADD KEY `idx_product_data_product_name` (`product_name`(100)),
+  ADD KEY `idx_product_data_created_at` (`created_at`);
 
 --
 -- Indexes for table `scraped_content`
@@ -263,6 +309,12 @@ ALTER TABLE `monitored_sites`
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `product_data`
+--
+ALTER TABLE `product_data`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
@@ -335,12 +387,19 @@ ALTER TABLE `change_history`
 ALTER TABLE `monitored_sites`
   ADD CONSTRAINT `monitored_sites_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
--- --
--- -- Constraints for table `notifications`
--- --
--- ALTER TABLE `notifications`
---   ADD CONSTRAINT `notifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
---   ADD CONSTRAINT `notifications_ibfk_2` FOREIGN KEY (`site_id`) REFERENCES `monitored_sites` (`id`) ON DELETE CASCADE;
+--
+-- Constraints for table `notifications`
+--
+ALTER TABLE `notifications`
+  ADD CONSTRAINT `notifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `notifications_ibfk_2` FOREIGN KEY (`site_id`) REFERENCES `monitored_sites` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `product_data`
+--
+ALTER TABLE `product_data`
+  ADD CONSTRAINT `product_data_ibfk_1` FOREIGN KEY (`site_id`) REFERENCES `monitored_sites` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `product_data_ibfk_2` FOREIGN KEY (`site_check_id`) REFERENCES `site_checks` (`id`) ON DELETE CASCADE;
 
 -- --
 -- -- Constraints for table `scraped_content`

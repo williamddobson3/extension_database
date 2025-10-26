@@ -4,12 +4,17 @@
 -- This file contains the complete, optimized database schema
 -- for the website monitoring system with all features integrated:
 -- - User management with blocking functionality
--- - Website monitoring with Kao Kirei integration
+-- - Website monitoring (including Kao Kirei sites as normal sites)
 -- - IP blocking system for enhanced security
 -- - Anti-evasion system for user registration
 -- - Notification guard system
 -- - Product-specific change detection
 -- - Comprehensive logging and analytics
+--
+-- IMPORTANT: Kao Kirei sites are treated as NORMAL sites
+-- - Users must add them manually
+-- - Notifications only sent to users who added the site
+-- - No global notifications or automatic site creation
 -- =====================================================
 
 -- Database setup
@@ -70,7 +75,9 @@ CREATE TABLE `user_notifications` (
 -- WEBSITE MONITORING TABLES
 -- =====================================================
 
--- Monitored sites with Kao Kirei integration
+-- Monitored sites (including Kao Kirei sites as normal sites)
+-- NOTE: is_global_notification column kept for backward compatibility but should always be 0
+-- All sites, including Kao Kirei, are treated as normal user-added sites
 CREATE TABLE `monitored_sites` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
@@ -84,7 +91,7 @@ CREATE TABLE `monitored_sites` (
   `last_response_time_ms` int(11) DEFAULT NULL,
   `last_scraping_method` varchar(50) DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT 1,
-  `is_global_notification` tinyint(1) DEFAULT 0,
+  `is_global_notification` tinyint(1) DEFAULT 0,  -- DEPRECATED: Always 0, kept for backward compatibility
   `scraping_method` enum('api','dom_parser') DEFAULT 'api',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
@@ -184,7 +191,9 @@ CREATE TABLE `product_data` (
 -- NOTIFICATION SYSTEM TABLES
 -- =====================================================
 
--- Notifications with global support
+-- Notifications (all notifications are user-specific now)
+-- NOTE: is_global column kept for backward compatibility but should always be 0
+-- All notifications are sent to specific users who added the monitored sites
 CREATE TABLE `notifications` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) DEFAULT NULL,
@@ -193,7 +202,7 @@ CREATE TABLE `notifications` (
   `message` text NOT NULL,
   `sent_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `status` enum('pending','sent','failed') DEFAULT 'pending',
-  `is_global` tinyint(1) DEFAULT 0,
+  `is_global` tinyint(1) DEFAULT 0,  -- DEPRECATED: Always 0, kept for backward compatibility
   PRIMARY KEY (`id`),
   KEY `site_id` (`site_id`),
   KEY `idx_notifications_user_id` (`user_id`),
@@ -628,28 +637,31 @@ DO
 -- INITIAL DATA INSERTION
 -- =====================================================
 
--- System user for global notifications
-INSERT INTO `users` (`id`, `username`, `email`, `password_hash`, `line_user_id`, `is_active`, `is_admin`, `is_blocked`, `blocked_at`, `blocked_by`, `block_reason`, `created_at`, `updated_at`) VALUES
-(0, 'system_global', 'system@global.notifications', '', NULL, 1, 1, 0, NULL, NULL, NULL, NOW(), NOW());
+-- Note: Kao Kirei sites are now treated as normal sites
+-- Users must add them manually to receive notifications
+-- No default global notifications or system users are created
 
--- Default Kao Kirei sites for global notifications
-INSERT INTO `monitored_sites` (`id`, `user_id`, `url`, `name`, `check_interval_hours`, `keywords`, `last_check`, `last_content_hash`, `last_status_code`, `last_response_time_ms`, `last_scraping_method`, `is_active`, `is_global_notification`, `scraping_method`, `created_at`, `updated_at`) VALUES
-(1, 0, 'https://www.kao-kirei.com/ja/expire-item/khg/?tw=khg', '花王 家庭用品の製造終了品一覧', 24, '製造終了品,家庭用品,花王', NULL, NULL, NULL, NULL, 'dom_parser', 1, 1, 'dom_parser', NOW(), NOW()),
-(2, 0, 'https://www.kao-kirei.com/ja/expire-item/kbb/?tw=kbb', '花王・カネボウ化粧品 製造終了品一覧', 24, '製造終了品,化粧品,花王,カネボウ', NULL, NULL, NULL, NULL, 'dom_parser', 1, 1, 'dom_parser', NOW(), NOW());
+-- Default IP blocking rules will be created when first admin user is created
+-- No default rules inserted here to avoid foreign key constraint issues
 
--- Sample global notifications for Kao Kirei sites
-INSERT INTO `notifications` (`id`, `user_id`, `site_id`, `type`, `message`, `sent_at`, `status`, `is_global`) VALUES
-(1, NULL, 1, 'email', '花王 家庭用品の製造終了品一覧に変更が検出されました。新しい商品が追加されたか、既存の商品が削除された可能性があります。', NOW(), 'pending', 1),
-(2, NULL, 2, 'line', '花王・カネボウ化粧品 製造終了品一覧に変更が検出されました。新しい商品が追加されたか、既存の商品が削除された可能性があります。', NOW(), 'pending', 1);
-
--- Default IP blocking rules
-INSERT INTO `ip_blocking_rules` (`rule_name`, `rule_type`, `rule_value`, `action`, `priority`, `created_by`) VALUES
-('Block Tor Exit Nodes', 'tor', 'true', 'block', 1, 0),
-('Block VPN Services', 'vpn', 'true', 'block', 2, 0),
-('Block Proxy Services', 'proxy', 'true', 'block', 3, 0),
-('Block High Risk IPs', 'risk_level', 'high', 'block', 4, 0),
-('Block Critical Risk IPs', 'risk_level', 'critical', 'block', 5, 0),
-('Block Hosting Providers', 'hosting', 'true', 'block', 6, 0);
+-- =====================================================
+-- HOW TO ADD KAO KIREI SITES (FOR USERS)
+-- =====================================================
+-- Users can add Kao Kirei sites manually through the extension:
+-- 
+-- Example 1: 花王 家庭用品の製造終了品一覧
+-- URL: https://www.kao-kirei.com/ja/expire-item/khg/?tw=khg
+-- Scraping Method: dom_parser
+-- Check Interval: 24 hours
+--
+-- Example 2: 花王・カネボウ化粧品 製造終了品一覧
+-- URL: https://www.kao-kirei.com/ja/expire-item/kbb/?tw=kbb
+-- Scraping Method: dom_parser
+-- Check Interval: 24 hours
+--
+-- These sites will be monitored like any other site, and notifications
+-- will only be sent to the user who added them.
+-- =====================================================
 
 -- =====================================================
 -- ADDITIONAL INDEXES FOR PERFORMANCE

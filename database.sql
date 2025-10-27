@@ -723,6 +723,486 @@ CREATE TABLE IF NOT EXISTS user_sessions (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- LINE follow events table
+CREATE TABLE IF NOT EXISTS line_follow_events (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    line_user_id VARCHAR(100) NOT NULL,
+    followed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    unfollowed_at TIMESTAMP NULL,
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_line_user_id (line_user_id),
+    INDEX idx_line_user_id (line_user_id),
+    INDEX idx_status (status),
+    INDEX idx_followed_at (followed_at)
+);
+
+-- =====================================================
+-- LINE MESSAGING API INTEGRATION TABLES
+-- =====================================================
+
+-- LINE message logs
+CREATE TABLE IF NOT EXISTS line_message_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    line_user_id VARCHAR(100) NOT NULL,
+    message_type ENUM('text', 'image', 'video', 'audio', 'file', 'location', 'sticker') NOT NULL,
+    message_content TEXT,
+    reply_token VARCHAR(255),
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status ENUM('sent', 'failed', 'pending') DEFAULT 'sent',
+    error_message TEXT NULL,
+    INDEX idx_line_user_id (line_user_id),
+    INDEX idx_sent_at (sent_at),
+    INDEX idx_status (status)
+);
+
+-- LINE notification queue
+CREATE TABLE IF NOT EXISTS line_notification_queue (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    line_user_id VARCHAR(100) NOT NULL,
+    message TEXT NOT NULL,
+    priority ENUM('low', 'normal', 'high', 'urgent') DEFAULT 'normal',
+    scheduled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    sent_at TIMESTAMP NULL,
+    status ENUM('pending', 'sent', 'failed', 'cancelled') DEFAULT 'pending',
+    retry_count INT DEFAULT 0,
+    max_retries INT DEFAULT 3,
+    error_message TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_user_id (user_id),
+    INDEX idx_line_user_id (line_user_id),
+    INDEX idx_status (status),
+    INDEX idx_scheduled_at (scheduled_at),
+    INDEX idx_priority (priority),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- =====================================================
+-- ENHANCED NOTIFICATION SYSTEM TABLES
+-- =====================================================
+
+-- Notification templates
+CREATE TABLE IF NOT EXISTS notification_templates (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    type ENUM('email', 'line', 'both') NOT NULL,
+    subject VARCHAR(255),
+    body_template TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_name (name),
+    INDEX idx_type (type),
+    INDEX idx_is_active (is_active)
+);
+
+-- Notification delivery logs
+CREATE TABLE IF NOT EXISTS notification_delivery_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    notification_id INT NOT NULL,
+    user_id INT NOT NULL,
+    delivery_type ENUM('email', 'line') NOT NULL,
+    delivery_status ENUM('pending', 'sent', 'delivered', 'failed', 'bounced') DEFAULT 'pending',
+    sent_at TIMESTAMP NULL,
+    delivered_at TIMESTAMP NULL,
+    failed_at TIMESTAMP NULL,
+    error_message TEXT NULL,
+    retry_count INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_notification_id (notification_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_delivery_type (delivery_type),
+    INDEX idx_delivery_status (delivery_status),
+    INDEX idx_sent_at (sent_at),
+    FOREIGN KEY (notification_id) REFERENCES notifications(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- =====================================================
+-- SYSTEM CONFIGURATION TABLES
+-- =====================================================
+
+-- System settings
+CREATE TABLE IF NOT EXISTS system_settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    setting_key VARCHAR(100) NOT NULL,
+    setting_value TEXT,
+    setting_type ENUM('string', 'number', 'boolean', 'json') DEFAULT 'string',
+    description TEXT,
+    is_public BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_setting_key (setting_key),
+    INDEX idx_is_public (is_public)
+);
+
+-- API rate limiting
+CREATE TABLE IF NOT EXISTS api_rate_limits (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NULL,
+    ip_address VARCHAR(45) NOT NULL,
+    endpoint VARCHAR(255) NOT NULL,
+    request_count INT DEFAULT 1,
+    window_start TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_user_id (user_id),
+    INDEX idx_ip_address (ip_address),
+    INDEX idx_endpoint (endpoint),
+    INDEX idx_window_start (window_start),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- =====================================================
+-- AUDIT AND LOGGING TABLES
+-- =====================================================
+
+-- System audit logs
+CREATE TABLE IF NOT EXISTS system_audit_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NULL,
+    action VARCHAR(100) NOT NULL,
+    resource_type VARCHAR(50) NOT NULL,
+    resource_id INT NULL,
+    old_values JSON NULL,
+    new_values JSON NULL,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user_id (user_id),
+    INDEX idx_action (action),
+    INDEX idx_resource_type (resource_type),
+    INDEX idx_created_at (created_at),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Error logs
+CREATE TABLE IF NOT EXISTS error_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    error_type VARCHAR(100) NOT NULL,
+    error_message TEXT NOT NULL,
+    stack_trace TEXT,
+    user_id INT NULL,
+    request_url VARCHAR(500),
+    request_method VARCHAR(10),
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    severity ENUM('low', 'medium', 'high', 'critical') DEFAULT 'medium',
+    resolved BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP NULL,
+    INDEX idx_error_type (error_type),
+    INDEX idx_user_id (user_id),
+    INDEX idx_severity (severity),
+    INDEX idx_resolved (resolved),
+    INDEX idx_created_at (created_at),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- =====================================================
+-- INITIAL DATA AND SYSTEM CONFIGURATION
+-- =====================================================
+
+-- Insert default system settings
+INSERT INTO system_settings (setting_key, setting_value, setting_type, description, is_public) VALUES
+('site_name', 'Website Monitor System', 'string', 'Name of the website monitoring system', TRUE),
+('site_description', 'Automated website change detection and notification system', 'string', 'Description of the system', TRUE),
+('max_sites_per_user', '50', 'number', 'Maximum number of sites a user can monitor', FALSE),
+('default_check_interval', '24', 'number', 'Default check interval in hours', FALSE),
+('max_notifications_per_hour', '100', 'number', 'Maximum notifications per user per hour', FALSE),
+('line_notifications_enabled', 'true', 'boolean', 'Whether LINE notifications are enabled', TRUE),
+('email_notifications_enabled', 'true', 'boolean', 'Whether email notifications are enabled', TRUE),
+('maintenance_mode', 'false', 'boolean', 'Whether the system is in maintenance mode', TRUE),
+('registration_enabled', 'true', 'boolean', 'Whether new user registration is enabled', TRUE),
+('api_rate_limit_per_minute', '60', 'number', 'API rate limit per minute per IP', FALSE),
+('session_timeout_hours', '24', 'number', 'User session timeout in hours', FALSE),
+('password_min_length', '8', 'number', 'Minimum password length', FALSE),
+('max_login_attempts', '5', 'number', 'Maximum login attempts before lockout', FALSE),
+('lockout_duration_minutes', '30', 'number', 'Account lockout duration in minutes', FALSE),
+('backup_retention_days', '30', 'number', 'Database backup retention period in days', FALSE);
+
+-- Insert default notification templates
+INSERT INTO notification_templates (name, type, subject, body_template, is_active) VALUES
+('website_change_detected', 'email', 'Website Change Detected - {{site_name}}', 
+'<h2>Website Change Detected</h2>
+<p>Hello {{username}},</p>
+<p>We have detected changes on the website you are monitoring:</p>
+<ul>
+<li><strong>Site:</strong> {{site_name}}</li>
+<li><strong>URL:</strong> {{site_url}}</li>
+<li><strong>Change Type:</strong> {{change_type}}</li>
+<li><strong>Detected At:</strong> {{detected_at}}</li>
+</ul>
+<p><strong>Change Details:</strong></p>
+<p>{{change_description}}</p>
+<p>You can view more details in your dashboard.</p>
+<p>Best regards,<br>Website Monitor System</p>', TRUE),
+
+('website_change_detected', 'line', 'Website Change Detected - {{site_name}}', 
+'🔔 Website Change Detected
+
+📊 Site: {{site_name}}
+🔗 URL: {{site_url}}
+📝 Change Type: {{change_type}}
+⏰ Detected: {{detected_at}}
+
+{{change_description}}
+
+View details in your dashboard.', TRUE),
+
+('test_notification', 'email', 'Test Notification - Website Monitor', 
+'<h2>Test Notification</h2>
+<p>Hello {{username}},</p>
+<p>This is a test notification from the Website Monitor System.</p>
+<p>If you received this message, your email notifications are working correctly!</p>
+<p>Best regards,<br>Website Monitor System</p>', TRUE),
+
+('test_notification', 'line', 'Test Notification - Website Monitor', 
+'🔔 Test Notification
+
+Hello {{username}}!
+
+This is a test notification from the Website Monitor System.
+
+✅ Your LINE notifications are working correctly!
+
+Thank you for using our service.', TRUE),
+
+('welcome_new_user', 'email', 'Welcome to Website Monitor System', 
+'<h2>Welcome to Website Monitor System!</h2>
+<p>Hello {{username}},</p>
+<p>Thank you for registering with our website monitoring service.</p>
+<p>You can now:</p>
+<ul>
+<li>Add websites to monitor</li>
+<li>Set up email and LINE notifications</li>
+<li>Track changes in real-time</li>
+</ul>
+<p>Get started by adding your first website to monitor!</p>
+<p>Best regards,<br>Website Monitor System</p>', TRUE),
+
+('welcome_new_user', 'line', 'Welcome to Website Monitor System', 
+'🎉 Welcome to Website Monitor System!
+
+Hello {{username}}!
+
+Thank you for registering with our website monitoring service.
+
+You can now:
+• Add websites to monitor
+• Set up email and LINE notifications  
+• Track changes in real-time
+
+Get started by adding your first website to monitor!', TRUE);
+
+-- Insert default IP blocking rules
+INSERT INTO ip_blocking_rules (rule_name, rule_type, rule_value, action, priority, is_active, created_by) VALUES
+('Block Tor Exit Nodes', 'tor', 'true', 'block', 10, TRUE, 1),
+('Block VPN Services', 'vpn', 'true', 'block', 20, TRUE, 1),
+('Block Proxy Services', 'proxy', 'true', 'block', 30, TRUE, 1),
+('Block Hosting Providers', 'hosting', 'true', 'block', 40, TRUE, 1),
+('Block High Risk IPs', 'risk_level', 'high', 'block', 50, TRUE, 1),
+('Block Critical Risk IPs', 'risk_level', 'critical', 'block', 60, TRUE, 1);
+
+-- =====================================================
+-- ENHANCED STORED PROCEDURES
+-- =====================================================
+
+-- Enhanced IP blocking check procedure
+DELIMITER //
+CREATE PROCEDURE CheckIPBlockingEnhanced(IN ip_address VARCHAR(45), IN user_id INT)
+BEGIN
+    DECLARE is_blocked TINYINT(1) DEFAULT 0;
+    DECLARE block_reason VARCHAR(500) DEFAULT NULL;
+    DECLARE expires_at TIMESTAMP DEFAULT NULL;
+    DECLARE risk_level VARCHAR(20) DEFAULT 'low';
+    
+    -- Check direct IP blocking
+    SELECT 
+        CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END,
+        MAX(bip.block_reason),
+        MAX(bip.expires_at)
+    INTO is_blocked, block_reason, expires_at
+    FROM blocked_ip_addresses bip
+    WHERE bip.ip_address = ip_address 
+    AND bip.is_active = 1
+    AND (bip.expires_at IS NULL OR bip.expires_at > NOW());
+    
+    -- If not directly blocked, check rules
+    IF is_blocked = 0 THEN
+        -- Check IP reputation
+        SELECT ir.risk_level INTO risk_level
+        FROM ip_reputation ir
+        WHERE ir.ip_address = ip_address
+        ORDER BY ir.last_seen DESC
+        LIMIT 1;
+        
+        -- Check blocking rules
+        SELECT 
+            CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END,
+            MAX(ibr.rule_name)
+        INTO is_blocked, block_reason
+        FROM ip_blocking_rules ibr
+        WHERE ibr.is_active = 1
+        AND (
+            (ibr.rule_type = 'risk_level' AND ibr.rule_value = risk_level) OR
+            (ibr.rule_type = 'tor' AND ibr.rule_value = 'true') OR
+            (ibr.rule_type = 'vpn' AND ibr.rule_value = 'true') OR
+            (ibr.rule_type = 'proxy' AND ibr.rule_value = 'true') OR
+            (ibr.rule_type = 'hosting' AND ibr.rule_value = 'true')
+        );
+    END IF;
+    
+    SELECT 
+        is_blocked as is_blocked,
+        block_reason as block_reason,
+        expires_at as expires_at,
+        risk_level as risk_level;
+END //
+DELIMITER ;
+
+-- Enhanced notification sending procedure
+DELIMITER //
+CREATE PROCEDURE SendNotification(
+    IN p_user_id INT,
+    IN p_site_id INT,
+    IN p_type ENUM('email','line'),
+    IN p_message TEXT,
+    IN p_priority ENUM('low','normal','high','urgent')
+)
+BEGIN
+    DECLARE v_line_user_id VARCHAR(100) DEFAULT NULL;
+    DECLARE v_email VARCHAR(100) DEFAULT NULL;
+    DECLARE v_notification_id INT;
+    
+    -- Get user notification preferences
+    IF p_type = 'line' THEN
+        SELECT un.line_user_id INTO v_line_user_id
+        FROM user_notifications un
+        WHERE un.user_id = p_user_id AND un.line_enabled = 1;
+        
+        IF v_line_user_id IS NOT NULL THEN
+            -- Add to LINE notification queue
+            INSERT INTO line_notification_queue (user_id, line_user_id, message, priority)
+            VALUES (p_user_id, v_line_user_id, p_message, p_priority);
+        END IF;
+    ELSE
+        SELECT u.email INTO v_email
+        FROM users u
+        WHERE u.id = p_user_id;
+        
+        IF v_email IS NOT NULL THEN
+            -- Create notification record
+            INSERT INTO notifications (user_id, site_id, type, message)
+            VALUES (p_user_id, p_site_id, p_type, p_message);
+            
+            SET v_notification_id = LAST_INSERT_ID();
+            
+            -- Create delivery log
+            INSERT INTO notification_delivery_logs (notification_id, user_id, delivery_type, delivery_status)
+            VALUES (v_notification_id, p_user_id, p_type, 'pending');
+        END IF;
+    END IF;
+END //
+DELIMITER ;
+
+-- =====================================================
+-- ENHANCED EVENTS FOR AUTOMATIC MAINTENANCE
+-- =====================================================
+
+-- Clean up old notification queue entries
+CREATE EVENT IF NOT EXISTS cleanup_old_notification_queue
+ON SCHEDULE EVERY 1 HOUR
+DO
+  DELETE FROM line_notification_queue 
+  WHERE status = 'sent' 
+  AND sent_at < DATE_SUB(NOW(), INTERVAL 7 DAY);
+
+-- Clean up old audit logs
+CREATE EVENT IF NOT EXISTS cleanup_old_audit_logs
+ON SCHEDULE EVERY 1 DAY
+DO
+  DELETE FROM system_audit_logs 
+  WHERE created_at < DATE_SUB(NOW(), INTERVAL 90 DAY);
+
+-- Clean up old error logs
+CREATE EVENT IF NOT EXISTS cleanup_old_error_logs
+ON SCHEDULE EVERY 1 DAY
+DO
+  DELETE FROM error_logs 
+  WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
+  AND resolved = TRUE;
+
+-- Clean up old API rate limit records
+CREATE EVENT IF NOT EXISTS cleanup_old_rate_limits
+ON SCHEDULE EVERY 1 HOUR
+DO
+  DELETE FROM api_rate_limits 
+  WHERE window_start < DATE_SUB(NOW(), INTERVAL 1 HOUR);
+
+-- =====================================================
+-- ENHANCED VIEWS FOR ANALYTICS
+-- =====================================================
+
+-- Comprehensive user statistics view
+CREATE OR REPLACE VIEW `user_statistics` AS
+SELECT 
+    u.id,
+    u.username,
+    u.email,
+    u.created_at,
+    u.is_active,
+    u.is_blocked,
+    COUNT(DISTINCT ms.id) as monitored_sites_count,
+    COUNT(DISTINCT CASE WHEN ms.is_active = 1 THEN ms.id END) as active_sites_count,
+    COUNT(DISTINCT n.id) as total_notifications,
+    COUNT(DISTINCT CASE WHEN n.sent_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN n.id END) as notifications_last_30_days,
+    MAX(ms.last_check) as last_site_check,
+    un.email_enabled,
+    un.line_enabled,
+    un.line_user_id
+FROM users u
+LEFT JOIN monitored_sites ms ON u.id = ms.user_id
+LEFT JOIN notifications n ON u.id = n.user_id
+LEFT JOIN user_notifications un ON u.id = un.user_id
+GROUP BY u.id, u.username, u.email, u.created_at, u.is_active, u.is_blocked, un.email_enabled, un.line_enabled, un.line_user_id;
+
+-- System health dashboard view
+CREATE OR REPLACE VIEW `system_health_dashboard` AS
+SELECT 
+    'Users' as metric,
+    COUNT(*) as total,
+    COUNT(CASE WHEN is_active = 1 THEN 1 END) as active,
+    COUNT(CASE WHEN is_blocked = 1 THEN 1 END) as blocked
+FROM users
+UNION ALL
+SELECT 
+    'Monitored Sites' as metric,
+    COUNT(*) as total,
+    COUNT(CASE WHEN is_active = 1 THEN 1 END) as active,
+    0 as blocked
+FROM monitored_sites
+UNION ALL
+SELECT 
+    'Notifications (24h)' as metric,
+    COUNT(*) as total,
+    COUNT(CASE WHEN status = 'sent' THEN 1 END) as active,
+    COUNT(CASE WHEN status = 'failed' THEN 1 END) as blocked
+FROM notifications
+WHERE sent_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+UNION ALL
+SELECT 
+    'LINE Messages (24h)' as metric,
+    COUNT(*) as total,
+    COUNT(CASE WHEN status = 'sent' THEN 1 END) as active,
+    COUNT(CASE WHEN status = 'failed' THEN 1 END) as blocked
+FROM line_message_logs
+WHERE sent_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR);
+
 -- =====================================================
 -- FINAL COMMIT
 -- =====================================================

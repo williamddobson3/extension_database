@@ -908,7 +908,7 @@ CREATE TABLE IF NOT EXISTS error_logs (
 -- =====================================================
 
 -- Insert default system settings
-INSERT INTO system_settings (setting_key, setting_value, setting_type, description, is_public) VALUES
+INSERT IGNORE INTO system_settings (setting_key, setting_value, setting_type, description, is_public) VALUES
 ('site_name', 'Website Monitor System', 'string', 'Name of the website monitoring system', TRUE),
 ('site_description', 'Automated website change detection and notification system', 'string', 'Description of the system', TRUE),
 ('max_sites_per_user', '50', 'number', 'Maximum number of sites a user can monitor', FALSE),
@@ -926,8 +926,8 @@ INSERT INTO system_settings (setting_key, setting_value, setting_type, descripti
 ('backup_retention_days', '30', 'number', 'Database backup retention period in days', FALSE);
 
 -- Insert default notification templates
-INSERT INTO notification_templates (name, type, subject, body_template, is_active) VALUES
-('website_change_detected', 'email', 'Website Change Detected - {{site_name}}', 
+INSERT IGNORE INTO notification_templates (name, type, subject, body_template, is_active) VALUES
+('website_change_detected_email', 'email', 'Website Change Detected - {{site_name}}', 
 '<h2>Website Change Detected</h2>
 <p>Hello {{username}},</p>
 <p>We have detected changes on the website you are monitoring:</p>
@@ -942,7 +942,7 @@ INSERT INTO notification_templates (name, type, subject, body_template, is_activ
 <p>You can view more details in your dashboard.</p>
 <p>Best regards,<br>Website Monitor System</p>', TRUE),
 
-('website_change_detected', 'line', 'Website Change Detected - {{site_name}}', 
+('website_change_detected_line', 'line', 'Website Change Detected - {{site_name}}', 
 '🔔 Website Change Detected
 
 📊 Site: {{site_name}}
@@ -954,14 +954,14 @@ INSERT INTO notification_templates (name, type, subject, body_template, is_activ
 
 View details in your dashboard.', TRUE),
 
-('test_notification', 'email', 'Test Notification - Website Monitor', 
+('test_notification_email', 'email', 'Test Notification - Website Monitor', 
 '<h2>Test Notification</h2>
 <p>Hello {{username}},</p>
 <p>This is a test notification from the Website Monitor System.</p>
 <p>If you received this message, your email notifications are working correctly!</p>
 <p>Best regards,<br>Website Monitor System</p>', TRUE),
 
-('test_notification', 'line', 'Test Notification - Website Monitor', 
+('test_notification_line', 'line', 'Test Notification - Website Monitor', 
 '🔔 Test Notification
 
 Hello {{username}}!
@@ -972,7 +972,7 @@ This is a test notification from the Website Monitor System.
 
 Thank you for using our service.', TRUE),
 
-('welcome_new_user', 'email', 'Welcome to Website Monitor System', 
+('welcome_new_user_email', 'email', 'Welcome to Website Monitor System', 
 '<h2>Welcome to Website Monitor System!</h2>
 <p>Hello {{username}},</p>
 <p>Thank you for registering with our website monitoring service.</p>
@@ -985,7 +985,7 @@ Thank you for using our service.', TRUE),
 <p>Get started by adding your first website to monitor!</p>
 <p>Best regards,<br>Website Monitor System</p>', TRUE),
 
-('welcome_new_user', 'line', 'Welcome to Website Monitor System', 
+('welcome_new_user_line', 'line', 'Welcome to Website Monitor System', 
 '🎉 Welcome to Website Monitor System!
 
 Hello {{username}}!
@@ -999,14 +999,19 @@ You can now:
 
 Get started by adding your first website to monitor!', TRUE);
 
--- Insert default IP blocking rules
-INSERT INTO ip_blocking_rules (rule_name, rule_type, rule_value, action, priority, is_active, created_by) VALUES
-('Block Tor Exit Nodes', 'tor', 'true', 'block', 10, TRUE, 1),
-('Block VPN Services', 'vpn', 'true', 'block', 20, TRUE, 1),
-('Block Proxy Services', 'proxy', 'true', 'block', 30, TRUE, 1),
-('Block Hosting Providers', 'hosting', 'true', 'block', 40, TRUE, 1),
-('Block High Risk IPs', 'risk_level', 'high', 'block', 50, TRUE, 1),
-('Block Critical Risk IPs', 'risk_level', 'critical', 'block', 60, TRUE, 1);
+-- Insert default IP blocking rules (only if admin user exists)
+INSERT IGNORE INTO ip_blocking_rules (rule_name, rule_type, rule_value, action, priority, is_active, created_by) 
+SELECT 'Block Tor Exit Nodes', 'tor', 'true', 'block', 10, TRUE, id FROM users WHERE is_admin = 1 LIMIT 1
+UNION ALL
+SELECT 'Block VPN Services', 'vpn', 'true', 'block', 20, TRUE, id FROM users WHERE is_admin = 1 LIMIT 1
+UNION ALL
+SELECT 'Block Proxy Services', 'proxy', 'true', 'block', 30, TRUE, id FROM users WHERE is_admin = 1 LIMIT 1
+UNION ALL
+SELECT 'Block Hosting Providers', 'hosting', 'true', 'block', 40, TRUE, id FROM users WHERE is_admin = 1 LIMIT 1
+UNION ALL
+SELECT 'Block High Risk IPs', 'risk_level', 'high', 'block', 50, TRUE, id FROM users WHERE is_admin = 1 LIMIT 1
+UNION ALL
+SELECT 'Block Critical Risk IPs', 'risk_level', 'critical', 'block', 60, TRUE, id FROM users WHERE is_admin = 1 LIMIT 1;
 
 -- =====================================================
 -- ENHANCED STORED PROCEDURES

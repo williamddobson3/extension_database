@@ -1000,18 +1000,38 @@ You can now:
 Get started by adding your first website to monitor!', TRUE);
 
 -- Insert default IP blocking rules (only if admin user exists)
-INSERT IGNORE INTO ip_blocking_rules (rule_name, rule_type, rule_value, action, priority, is_active, created_by) 
-SELECT 'Block Tor Exit Nodes', 'tor', 'true', 'block', 10, TRUE, id FROM users WHERE is_admin = 1 LIMIT 1
-UNION ALL
-SELECT 'Block VPN Services', 'vpn', 'true', 'block', 20, TRUE, id FROM users WHERE is_admin = 1 LIMIT 1
-UNION ALL
-SELECT 'Block Proxy Services', 'proxy', 'true', 'block', 30, TRUE, id FROM users WHERE is_admin = 1 LIMIT 1
-UNION ALL
-SELECT 'Block Hosting Providers', 'hosting', 'true', 'block', 40, TRUE, id FROM users WHERE is_admin = 1 LIMIT 1
-UNION ALL
-SELECT 'Block High Risk IPs', 'risk_level', 'high', 'block', 50, TRUE, id FROM users WHERE is_admin = 1 LIMIT 1
-UNION ALL
-SELECT 'Block Critical Risk IPs', 'risk_level', 'critical', 'block', 60, TRUE, id FROM users WHERE is_admin = 1 LIMIT 1;
+-- Note: These rules will be inserted when the first admin user is created
+-- For now, we'll create a simple procedure to insert them
+DELIMITER //
+CREATE PROCEDURE InsertDefaultIPBlockingRules(IN admin_user_id INT)
+BEGIN
+    INSERT IGNORE INTO ip_blocking_rules (rule_name, rule_type, rule_value, action, priority, is_active, created_by) VALUES
+    ('Block Tor Exit Nodes', 'tor', 'true', 'block', 10, TRUE, admin_user_id),
+    ('Block VPN Services', 'vpn', 'true', 'block', 20, TRUE, admin_user_id),
+    ('Block Proxy Services', 'proxy', 'true', 'block', 30, TRUE, admin_user_id),
+    ('Block Hosting Providers', 'hosting', 'true', 'block', 40, TRUE, admin_user_id),
+    ('Block High Risk IPs', 'risk_level', 'high', 'block', 50, TRUE, admin_user_id),
+    ('Block Critical Risk IPs', 'risk_level', 'critical', 'block', 60, TRUE, admin_user_id);
+END //
+DELIMITER ;
+
+-- =====================================================
+-- TRIGGERS FOR AUTOMATIC DATA INSERTION
+-- =====================================================
+
+-- Trigger to insert default IP blocking rules when first admin user is created
+DELIMITER //
+CREATE TRIGGER after_admin_user_insert
+AFTER INSERT ON users
+FOR EACH ROW
+BEGIN
+    -- Check if this is the first admin user
+    IF NEW.is_admin = 1 AND (SELECT COUNT(*) FROM users WHERE is_admin = 1) = 1 THEN
+        -- Insert default IP blocking rules
+        CALL InsertDefaultIPBlockingRules(NEW.id);
+    END IF;
+END //
+DELIMITER ;
 
 -- =====================================================
 -- ENHANCED STORED PROCEDURES
@@ -1207,6 +1227,19 @@ SELECT
     COUNT(CASE WHEN status = 'failed' THEN 1 END) as blocked
 FROM line_message_logs
 WHERE sent_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR);
+
+-- =====================================================
+-- MANUAL DATA INSERTION SCRIPTS
+-- =====================================================
+
+-- To manually insert IP blocking rules for existing admin users:
+-- CALL InsertDefaultIPBlockingRules(1); -- Replace 1 with actual admin user ID
+
+-- To check if IP blocking rules exist:
+-- SELECT COUNT(*) as rule_count FROM ip_blocking_rules;
+
+-- To view all IP blocking rules:
+-- SELECT rule_name, rule_type, rule_value, action, priority, is_active FROM ip_blocking_rules;
 
 -- =====================================================
 -- FINAL COMMIT
